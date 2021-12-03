@@ -1,3 +1,5 @@
+// https://adventofcode.com/2021/day/1
+
 #![warn(unused_crate_dependencies)]
 #![warn(clippy::pedantic)]
 
@@ -8,21 +10,21 @@ use std::path::Path;
 use std::process;
 use std::str::FromStr;
 
-// https://adventofcode.com/2021/day/2
 fn main() {
-    let commands_file = env::args().nth(1).unwrap_or_else(|| {
+    let path = env::args().nth(1).unwrap_or_else(|| {
         eprintln!("One argument required - the input file path!");
         process::exit(1);
     });
+    let commands = read_commands(path);
 
-    let position = calculate_position(&commands_file);
+    let position = calculate_position(&commands);
     println!(
         "Part 1: Position is {:?}. Horizontal x Depth = {}",
         position,
         position.horizontal * position.depth
     );
 
-    let position_with_aim = calculate_position_with_aim(&commands_file);
+    let position_with_aim = calculate_position_with_aim(&commands);
     println!(
         "Part 2: Position using aim is {:?}. Horizontal x Depth = {}",
         position_with_aim,
@@ -30,31 +32,32 @@ fn main() {
     );
 }
 
-fn calculate_position(commands_file: impl AsRef<Path>) -> Position {
-    let commands = read_commands(commands_file);
-    let starting_position = Position::new();
-    commands.fold(starting_position, |position, command| {
-        position.get_position_after_command(&command)
-    })
-}
-
-fn calculate_position_with_aim(commands_file: impl AsRef<Path>) -> PositionWithAim {
-    let commands = read_commands(commands_file);
-    let starting_position = PositionWithAim::new();
-    commands.fold(starting_position, |position, command| {
-        position.get_position_after_command(&command)
-    })
-}
-
-fn read_commands(commands_file: impl AsRef<Path>) -> impl Iterator<Item = Command> {
-    read_lines(commands_file).map(|line| line.parse::<Command>().expect("Error parsing line"))
-}
-
-fn read_lines(path: impl AsRef<Path>) -> impl Iterator<Item = String> {
+fn read_commands(path: impl AsRef<Path>) -> Vec<Command> {
     let f = File::open(path).expect("Error opening input file");
-    let reader = BufReader::new(f);
+    BufReader::new(f)
+        .lines()
+        .map(|line| {
+            line.expect("Error reading line")
+                .parse::<Command>()
+                .expect("Error parsing line")
+        })
+        .collect()
+}
 
-    reader.lines().map(|line| line.expect("Error reading line"))
+fn calculate_position(commands: &[Command]) -> Position {
+    let mut position = Position::new();
+    for command in commands {
+        position.apply_command(command);
+    }
+    position
+}
+
+fn calculate_position_with_aim(commands: &[Command]) -> PositionWithAim {
+    let mut position = PositionWithAim::new();
+    for command in commands {
+        position.apply_command(command);
+    }
+    position
 }
 
 #[derive(Debug, PartialEq)]
@@ -71,22 +74,13 @@ impl Position {
         }
     }
 
-    fn get_position_after_command(&self, command: &Command) -> Self {
+    fn apply_command(&mut self, command: &Command) {
         match command.direction {
-            Direction::Forward => Self {
-                horizontal: self.horizontal + command.amount,
-                depth: self.depth,
-            },
+            Direction::Forward => self.horizontal += command.amount,
             // Since this is depth, `Up` decreases the value, rather than the inverse.
-            Direction::Up => Self {
-                horizontal: self.horizontal,
-                depth: self.depth - command.amount,
-            },
-            Direction::Down => Self {
-                horizontal: self.horizontal,
-                depth: self.depth + command.amount,
-            },
-        }
+            Direction::Up => self.depth -= command.amount,
+            Direction::Down => self.depth += command.amount,
+        };
     }
 }
 
@@ -107,26 +101,17 @@ impl PositionWithAim {
         }
     }
 
-    fn get_position_after_command(&self, command: &Command) -> Self {
+    fn apply_command(&mut self, command: &Command) {
         match command.direction {
-            Direction::Forward => Self {
-                horizontal: self.horizontal + command.amount,
-                depth: self.depth + self.aim * command.amount,
-                aim: self.aim,
-            },
-            Direction::Up => Self {
-                horizontal: self.horizontal,
-                depth: self.depth,
-                // Aim shallower.
-                aim: self.aim - command.amount,
-            },
-            Direction::Down => Self {
-                horizontal: self.horizontal,
-                depth: self.depth,
-                // Aim deeper.
-                aim: self.aim + command.amount,
-            },
-        }
+            Direction::Forward => {
+                self.horizontal += command.amount;
+                self.depth += self.aim * command.amount;
+            }
+            // Aim shallower.
+            Direction::Up => self.aim -= command.amount,
+            // Aim deeper.
+            Direction::Down => self.aim += command.amount,
+        };
     }
 }
 
@@ -187,7 +172,8 @@ mod tests {
 
     #[test]
     fn part_one_example() {
-        let position = calculate_position(example_file());
+        let commands = read_commands(example_file());
+        let position = calculate_position(&commands);
         assert_eq!(position.horizontal, 15);
         assert_eq!(position.depth, 10);
         assert_eq!(position.horizontal * position.depth, 150);
@@ -195,7 +181,8 @@ mod tests {
 
     #[test]
     fn part_two_example() {
-        let position = calculate_position_with_aim(example_file());
+        let commands = read_commands(example_file());
+        let position = calculate_position_with_aim(&commands);
         assert_eq!(position.horizontal, 15);
         assert_eq!(position.depth, 60);
         assert_eq!(position.horizontal * position.depth, 900);
