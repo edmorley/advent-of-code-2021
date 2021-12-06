@@ -1,3 +1,4 @@
+// Day 2: Dive!
 // https://adventofcode.com/2021/day/1
 
 #![warn(unused_crate_dependencies)]
