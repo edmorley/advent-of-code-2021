@@ -46,37 +46,38 @@ fn read_graph(path: impl AsRef<Path>) -> HashMap<String, Vec<String>> {
 
 fn total_paths(graph: &HashMap<String, Vec<String>>, only_visit_small_caves_once: bool) -> u64 {
     let mut unexplored_routes = vec![Route {
-        current_node: String::from("start"),
+        current_node: "start",
         visited: HashSet::new(),
         small_cave_visited_twice: false,
     }];
     let mut completed_routes = 0;
 
-    while let Some(route) = unexplored_routes.pop() {
+    while let Some(mut route) = unexplored_routes.pop() {
         if route.current_node == "end" {
             completed_routes += 1;
             continue;
         }
 
-        let mut visited = route.visited.clone();
-        visited.insert(route.current_node.to_string());
+        route.visited.insert(route.current_node);
 
-        for adjacent_node in graph.get(&route.current_node).unwrap_or(&Vec::new()) {
-            let mut small_cave_visited_twice = route.small_cave_visited_twice;
-            if is_small_cave(adjacent_node) && route.visited.contains(adjacent_node) {
-                if adjacent_node == "start"
-                    || only_visit_small_caves_once
-                    || small_cave_visited_twice
-                {
-                    continue;
+        if let Some(adjacent_nodes) = graph.get(route.current_node) {
+            for adjacent_node in adjacent_nodes {
+                let mut small_cave_visited_twice = route.small_cave_visited_twice;
+                if is_small_cave(adjacent_node) && route.visited.contains(adjacent_node.as_str()) {
+                    if adjacent_node == "start"
+                        || only_visit_small_caves_once
+                        || small_cave_visited_twice
+                    {
+                        continue;
+                    }
+                    small_cave_visited_twice = true;
                 }
-                small_cave_visited_twice = true;
+                unexplored_routes.push(Route {
+                    current_node: adjacent_node,
+                    visited: route.visited.clone(),
+                    small_cave_visited_twice,
+                });
             }
-            unexplored_routes.push(Route {
-                current_node: adjacent_node.to_string(),
-                visited: visited.clone(),
-                small_cave_visited_twice,
-            });
         }
     }
 
@@ -87,9 +88,9 @@ fn is_small_cave(name: &str) -> bool {
     name == name.to_lowercase()
 }
 
-struct Route {
-    current_node: String,
-    visited: HashSet<String>,
+struct Route<'a> {
+    current_node: &'a str,
+    visited: HashSet<&'a str>,
     small_cave_visited_twice: bool,
 }
 
